@@ -61,7 +61,14 @@ export function extractDiagramSvg(html: string, options: { fonts?: 'google' | 'n
     openTag = openTag.replace(/^<svg\b/u, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"')
   }
   if (options.fonts === 'google') {
-    inner = `<style type="text/css"><![CDATA[${GOOGLE_FONTS_IMPORT}]]></style>${inner}`
+    // Keep <title> the first child of the exported SVG (accessible contract):
+    // the font stylesheet goes after the title/desc block, not before it.
+    const fontStyle = `<style type="text/css"><![CDATA[${GOOGLE_FONTS_IMPORT}]]></style>`
+    const descEnd = inner.indexOf('</desc>')
+    const titleEnd = inner.indexOf('</title>')
+    if (descEnd >= 0) inner = `${inner.slice(0, descEnd + 7)}${fontStyle}${inner.slice(descEnd + 7)}`
+    else if (titleEnd >= 0) inner = `${inner.slice(0, titleEnd + 8)}${fontStyle}${inner.slice(titleEnd + 8)}`
+    else inner = `${fontStyle}${inner}`
   }
   const documentTitle = /<title\b[^>]*>([\s\S]*?)<\/title>/u.exec(html)?.[1]?.trim()
   const svgTitle = /<title\b[^>]*>([\s\S]*?)<\/title>/u.exec(inner)?.[1]?.trim()

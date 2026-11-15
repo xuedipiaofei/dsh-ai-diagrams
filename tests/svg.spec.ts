@@ -24,8 +24,11 @@ describe('extractDiagramSvg', () => {
   })
 
   it('embeds the font import only when requested', () => {
-    expect(extractDiagramSvg(HTML, { fonts: 'google' }).svg).toContain('fonts.googleapis.com')
+    const withFonts = extractDiagramSvg(HTML, { fonts: 'google' }).svg
+    expect(withFonts).toContain('fonts.googleapis.com')
     expect(extractDiagramSvg(HTML, { fonts: 'none' }).svg).not.toContain('fonts.googleapis.com')
+    // The accessible contract requires <title> first, so the font style follows it.
+    expect(withFonts.indexOf('<title')).toBeLessThan(withFonts.indexOf('<style'))
   })
 
   it('adds a missing xmlns', () => {

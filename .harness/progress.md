@@ -21,8 +21,17 @@
 - 无 Python：SVG 提取、自检、解析器均为 TS；PNG 由浏览器 canvas 2× 光栅化。
 - 静态契约：保存的 HTML 不允许 `<script>`，远程资源仅允许 Google Fonts；motion 变体暂不支持预览。
 
+## 真机验证（2026-11-15 16:25，desktop profile）
+- `plugin_manager install_bundle` 安装成功：`application: applied`，profile 以 symlink 指向工作区 checkout。
+- 运行中的 GUI：`GET /api/dsh-ai-diagrams/health` → `{"ok":true,"plugin":"ai-diagrams"}`。
+- 会话 skill catalog 出现 `diagram-design`；4 个工具已可调用（schema 已注入）。
+- 端到端：`diagram_save` 保存 `diagrams/diagram-6c490dc6.html`（6612 B，卡片已渲染）；
+  `diagram_svg` 导出 `diagrams/diagram-6c490dc6.svg`（5026 B，含字体 import）；
+  `diagram_import` 解析现有 `diagrams/diagram-284bb748.drawio` → 15 节点 / 14 边（中文标签正常）。
+- 修复：导出的 SVG 中字体 `<style>` 原本在 `<title>` 之前，违反「title 为第一子元素」；已改为 title/desc 之后插入，
+  重建 + 248 测试通过（运行中的旧实例需重启才会用新 lib，对已导出的文件无影响）。
+
 ## 待办
-1. 真机安装验证（需用户同意装进 desktop profile）：`dsh plugin --profile desktop add /path/to/dsh-ai-diagrams`
-2. 生成市场截图/演示 GIF（真机卡片 + 画廊）
-3. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿
-4. P1：模板画廊侧栏、品牌 profile 工具、PNG 落盘、PlantUML 解析、上游同步脚本
+1. 生成市场截图/演示 GIF（真机卡片 + 画廊）
+2. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿
+3. P1：模板画廊侧栏、品牌 profile 工具、PNG 落盘、PlantUML 解析、上游同步脚本
