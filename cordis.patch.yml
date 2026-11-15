@@ -1,0 +1,5 @@
+# bundle patch for the AI diagrams plugin: inserts its plugin row into the web
+# profile roster (the `dsh.bundle.patch` manifest field).
+- insert:
+    - id: ai-diagrams
+      name: 'dsh-ai-diagrams'

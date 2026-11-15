@@ -1,0 +1,14 @@
+{
+  "upstream": "cathrynlavery/diagram-design",
+  "license": "MIT",
+  "commit": "f6db0decea96de66b901331a0f79a8d4b147ebae",
+  "commitDate": "2026-11-12T21:14:18Z",
+  "version": "2.6.164",
+  "vendoredAt": "2026-11-15T11:05:00+08:00",
+  "vendored": "skills/diagram-design",
+  "files": 317,
+  "bytes": 5802355,
+  "patches": [
+    "SKILL.md: appended the DeepSeek Harness tools section (diagram_save / diagram_svg / diagram_validate / diagram_import)"
+  ]
+}
