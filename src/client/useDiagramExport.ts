@@ -46,11 +46,29 @@ function viewBoxSize(svg: string): { width: number; height: number } | undefined
   return { width: parts[2]!, height: parts[3]! }
 }
 
+/**
+ * Prepare standalone SVG markup for `<img>` decoding: strip the XML prolog and
+ * pin the intrinsic width/height on the root without duplicating an existing
+ * `xmlns` (a redefined xmlns makes Chrome refuse the SVG image).
+ * @param svg - exported standalone SVG text.
+ * @param size - viewBox size to use for rasterization.
+ * @returns markup for a `data:image/svg+xml` URL.
+ */
+export function rasterMarkup(svg: string, size: { width: number; height: number }): string {
+  const stripped = svg.replace(/<\?xml[^>]*\?>/iu, '')
+  return stripped.replace(/<svg\b([^>]*)>/iu, (_match, attrs: string) => {
+    const rest = attrs
+      .replace(/\swidth\s*=\s*(?:"[^"]*"|'[^']*')/iu, '')
+      .replace(/\sheight\s*=\s*(?:"[^"]*"|'[^']*')/iu, '')
+    return `<svg width="${size.width}" height="${size.height}"${rest}>`
+  })
+}
+
 /** Turn standalone SVG into a 2× PNG blob through a canvas. */
 async function rasterizePng(svg: string): Promise<Blob> {
   const size = viewBoxSize(svg) ?? { width: 1200, height: 800 }
   const scale = 2
-  const markup = svg.replace(/<\?xml[^>]*\?>/iu, '').replace(/<svg/iu, `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}"`)
+  const markup = rasterMarkup(svg, size)
   // A blob: URL taints the canvas in Chromium when it wraps an SVG (verified in
   // the drawio-chat work), so the raster source is a data: URL instead.
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`

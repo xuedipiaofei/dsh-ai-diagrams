@@ -31,6 +31,13 @@
 - 修复：导出的 SVG 中字体 `<style>` 原本在 `<title>` 之前，违反「title 为第一子元素」；已改为 title/desc 之后插入，
   重建 + 248 测试通过（运行中的旧实例需重启才会用新 lib，对已导出的文件无影响）。
 
+## PNG 导出修复（2026-11-15 17:17）
+- 真机点 PNG 报错「could not decode the diagram SVG」：客户端 `rasterizePng` 把导出的 SVG 塞进 `<img>` 时，
+  在原根标签上又插了一次 `xmlns`（Chrome 报 `Attribute xmlns redefined`，拒绝解码）。
+- 修复：`rasterMarkup()` 只补 width/height，删除已有 width/height，不重复 xmlns；新增 `tests/raster.spec.ts`。
+- 验证：250 tests 通过；用同一张架构图的 `fonts=none` SVG 在 headless Chrome 里跑修复后逻辑 →
+  `OK png-bytes=219626 xmlns-count=1`。页面需刷新/重启加载新客户端 bundle。
+
 ## 待办
 1. 生成市场截图/演示 GIF（真机卡片 + 画廊）
 2. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿
