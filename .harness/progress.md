@@ -73,6 +73,10 @@
 - 主机 PNG：调用本机 Chrome/Chromium headless 2× 落盘；找不到浏览器时报可操作错误。
 - 284 tests（含 gallery/png/profile/panel 测试）、typecheck、build 全部通过；版本 0.2.0。
 
+## 0.2.0 已发布（2026-11-16 15:0x）
+- npm `latest=0.2.0`（处理约 2.5 分钟）；tag `v0.2.0` + Release 已创建。
+- 待做：重启 DSH 后验证右侧栏画廊与新工具（types/profile/png/PlantUML）。
+
 ## 待办
 1. 生成市场截图/演示 GIF（真机卡片 + 画廊）
 2. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿
