@@ -47,6 +47,15 @@
 - 结论：客户端卡片与 PNG 导出端到端正常；之前「看不到」是工具调用行默认折叠，展开即见。
 - 顺手修：导出文件名 stem 去首尾分隔符（`-diagram_save-.png` → `diagram_save.png`），新增测试；251 tests 通过。
 
+## 发布准备（2026-11-16 12:35）
+- 市场截图素材已生成并入库：`docs/images/plugin-row.png`（插件管理页「AI 图表」条目）、
+  `docs/images/architecture-example.png`、`docs/images/sequence-example.png`（真实渲染）；
+  `screenshots.json` 已更新。
+- 重新实测确认：headless 登录运行中的 GUI 后点击卡片 **PNG**，真实下载 143 KB PNG、无报错；
+  卡片在会话中渲染正常（会话很长，卡片在工具调用行内，需滚动到位）。
+- 发布阻塞（凭据）：npm token 401 失效；GitHub 仅有 SSH（可推已有仓库），无 token/gh 无法建仓库、
+  fork 或开 PR。已把解阻步骤写进 `PUBLISHING.md` §5。
+
 ## 待办
 1. 生成市场截图/演示 GIF（真机卡片 + 画廊）
 2. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿
