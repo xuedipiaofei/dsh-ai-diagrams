@@ -35,8 +35,10 @@ export function svgUrl(path: string, fonts: 'google' | 'none'): string {
   return `${ROUTES.svg}?path=${encodeURIComponent(path)}&fonts=${fonts}`
 }
 
-/** Filesystem-safe file stem for a title. */
+/** Filesystem-safe file stem for a title (trimmed, never a bare dash). */
 export function fileStem(title: string | undefined): string {
-  const stem = (title ?? 'diagram').replace(/[^\w.-]+/gu, '-')
+  const stem = (title ?? 'diagram')
+    .replace(/[^\w.-]+/gu, '-')
+    .replace(/^[-.]+|[-.]+$/gu, '')
   return stem === '' ? 'diagram' : stem
 }

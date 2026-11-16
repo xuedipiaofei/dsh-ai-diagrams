@@ -38,6 +38,15 @@
 - 验证：250 tests 通过；用同一张架构图的 `fonts=none` SVG 在 headless Chrome 里跑修复后逻辑 →
   `OK png-bytes=219626 xmlns-count=1`。页面需刷新/重启加载新客户端 bundle。
 
+## 独立真机验证（2026-11-16 12:27，运行中的 GUI 51523）
+- 用 `.dsh/.credentials.yaml` 的 browser-session secret 按 DSH 原生格式签发了 loopback cookie，
+  以 headless Chrome + CDP 登录运行中的 GUI（未改动用户 profile/页面）。
+- 打开最新会话后 DOM：`[data-dsh-part="ai-diagrams-card"]` ×2，按钮为 HTML / SVG / PNG / 打开 / 放大；
+  console/exception 无错误。
+- 实际点击卡片上的 PNG：下载成功 `-diagram_save-.png`（143,022 bytes），卡片无「导出失败」。
+- 结论：客户端卡片与 PNG 导出端到端正常；之前「看不到」是工具调用行默认折叠，展开即见。
+- 顺手修：导出文件名 stem 去首尾分隔符（`-diagram_save-.png` → `diagram_save.png`），新增测试；251 tests 通过。
+
 ## 待办
 1. 生成市场截图/演示 GIF（真机卡片 + 画廊）
 2. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿
