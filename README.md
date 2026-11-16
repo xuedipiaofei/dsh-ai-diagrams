@@ -36,9 +36,19 @@ Redraw an existing diagram:
 
 The agent calls `diagram_import`, gets a structure digest, picks the matching type, and saves the editorial version.
 
+Browse the bundled types in the right sidebar (**+ → AI diagrams gallery**): search, preview an example, and copy a ready-to-send prompt. The same list is available to the agent as `diagram_types`.
+
 Match your brand once:
 
-> Onboard diagram-design to https://example.com — use our palette and fonts.
+> Learn the brand from https://example.com and save it as "acme", then draw this quarter's roadmap with the acme profile.
+
+`diagram_profile` extracts the palette and typefaces into `$DSH_HOME/editorial-diagrams/profiles/<name>.md`; later diagrams reuse the same tokens.
+
+Need a PNG file instead of a browser download? Ask for it:
+
+> Export that diagram as a PNG next to the HTML.
+
+`diagram_png` rasterizes the saved page at 2× with the machine's Chrome/Chromium (no Python, no Playwright).
 
 ## Tools
 
@@ -53,7 +63,8 @@ Match your brand once:
 
 - No Python and no Playwright: validation, SVG export, source parsing and PNG rasterization are TypeScript/browser code.
 - Saved diagrams are static: no `<script>`, no remote assets except the approved Google Fonts stylesheet. Motion variants are not previewed in DSH.
-- PNG is rasterized in the browser at 2×; webfonts fall back to local fonts in the PNG.
+- PNG is rasterized in the browser at 2× on the card; `diagram_png` needs a locally installed Chrome/Chromium (set `CHROME_PATH` when it is not in a standard location).
+- The gallery and brand profiles only read public pages: `diagram_profile fetch` rejects loopback/private targets and caps a page at 1 MB.
 - The skill's deep painted-geometry checker (`verify_geometry.py`) is not ported; the DSH validator checks the accessible/SVG contract and single-file safety.
 
 ## License

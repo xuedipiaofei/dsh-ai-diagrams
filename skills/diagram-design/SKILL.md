@@ -408,5 +408,10 @@ This copy of the skill ships inside the **dsh-ai-diagrams** DSH plugin. Use the 
 - **`diagram_svg`** — write the standalone `.svg` (diagram only) next to the saved HTML, with or without the Google Fonts import.
 - **`diagram_validate`** — check the accessible-SVG / single-file contract and return the exact errors before saving.
 - **`diagram_import`** — extract a bounded structure digest from `.drawio`, Mermaid, Excalidraw or PlantUML sources; prefer it over reading a large source file.
+- **`diagram_types`** — list/search the bundled diagram types with their "Best for" line; prefer it over scanning the large type table, then load the chosen `references/type-<slug>.md`.
+- **`diagram_profile`** — learn a reusable brand profile from a public site (`fetch`), then list/get/delete saved profiles; apply the palette and typefaces to `{ink}`/`{paper}`/`{accent}` and the heading/body fonts.
+- **`diagram_png`** — rasterize a saved diagram into a workspace `.png` (2×) with a locally installed Chrome/Chromium; use it when a file is needed for a document or slide instead of asking the user to click the card button.
+
+The right sidebar also has an interactive gallery: every type, a search box, an example preview and a "copy prompt" action.
 
 Saved diagrams are static documents: no `<script>`, no remote resources other than the approved Google Fonts stylesheet. Motion variants are not previewable in DSH — render the static frame. All `references/`, `scripts/` and `assets/` paths are relative to this skill directory.

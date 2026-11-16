@@ -1,26 +1,33 @@
 /**
  * Host half of the dsh-ai-diagrams plugin.
  *
- * One bundled skill + four tools:
+ * One bundled skill + seven tools:
  * - the `diagram-design` agent skill (full upstream skill, registered through
  *   `ctx.skills.registerProvider` so the model can load it like any local skill);
  * - `diagram_save`      validate + save a generated HTML diagram, render it inline;
  * - `diagram_svg`       export the diagram SVG from a saved HTML file;
  * - `diagram_validate`  check a diagram HTML against the accessible/safety contract;
  * - `diagram_import`    extract a structural digest from draw.io / Mermaid /
- *                       Excalidraw sources so the model can redraw them.
+ *                       Excalidraw / PlantUML sources so the model can redraw them;
+ * - `diagram_types`     search the 50 bundled diagram types;
+ * - `diagram_profile`   fetch a site's palette/fonts into a reusable brand profile;
+ * - `diagram_png`       rasterize a saved diagram into a workspace PNG.
  *
  * The plugin never runs the skill's Python helpers: the parts DSH needs (verify,
  * SVG export, source extraction, PNG via the browser) are TypeScript here.
  */
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import { buildTypeIndex, type DiagramType } from './core/gallery.ts'
 import { importDiagram, renderDigest } from './core/import.ts'
+import { findBrowser, renderPng } from './core/png.ts'
+import { extractBrandProfile, profilePath, renderProfile, safeProfileName } from './core/profile.ts'
 import { extractDiagramSvg } from './core/svg.ts'
 import { renderValidation, validateDiagramHtml, type ValidationResult } from './core/validate.ts'
 
@@ -37,6 +44,10 @@ export const ROUTES = {
   raw: '/api/dsh-ai-diagrams/raw',
   /** Standalone SVG export of a saved diagram. */
   svg: '/api/dsh-ai-diagrams/svg',
+  /** Diagram-type index for the gallery panel. */
+  gallery: '/api/dsh-ai-diagrams/gallery',
+  /** One bundled example page from the skill's assets directory. */
+  asset: '/api/dsh-ai-diagrams/asset',
 } as const
 
 /** Tool names shared with the browser half. */
@@ -45,7 +56,13 @@ export const TOOL_NAMES = {
   svg: 'diagram_svg',
   validate: 'diagram_validate',
   import: 'diagram_import',
+  types: 'diagram_types',
+  profile: 'diagram_profile',
+  png: 'diagram_png',
 } as const
+
+/** Sidebar gallery kind opened by the client guide entry. */
+export const GALLERY_KIND = 'diagrams-gallery'
 
 /** Resolve the vendored agent skill directory (package-relative; cwd fallback under test runners). */
 function resolveSkillDir(): string {
@@ -76,6 +93,117 @@ const lastByCwd = new Map<string, string>()
 
 /** Files this process wrote; the preview routes serve only these. */
 const knownFiles = new Set<string>()
+
+/** Cap for a fetched brand page. */
+const MAX_BRAND_BYTES = 1024 * 1024
+
+/** Cached diagram-type index (the vendored skill is static). */
+let typeIndexCache: DiagramType[] | undefined
+
+/** Read the type index once per process. */
+function getTypes(): DiagramType[] {
+  typeIndexCache ??= buildTypeIndex(SKILL_DIR)
+  return typeIndexCache
+}
+
+/** Example asset names the gallery may preview (no arbitrary file reads). */
+function exampleAssets(): Set<string> {
+  const names = new Set<string>()
+  for (const type of getTypes()) {
+    if (type.example !== undefined) names.add(type.example)
+  }
+  return names
+}
+
+/** Brand profile directory under the DSH home. */
+function brandProfileDir(): string {
+  const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+  return join(home, 'editorial-diagrams', 'profiles')
+}
+
+/** One saved brand profile summary. */
+interface ProfileSummary {
+  name: string
+  title?: string
+  source?: string
+  fetched?: string
+}
+
+/** List saved brand profiles. */
+function listProfiles(dir: string): ProfileSummary[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter(file => file.toLowerCase().endsWith('.md'))
+    .sort()
+    .map((file) => {
+      const name = file.replace(/\.md$/iu, '')
+      let text = ''
+      try {
+        text = readFileSync(join(dir, file), 'utf8')
+      } catch {
+        return { name }
+      }
+      const title = /^-\s*title:\s*(.+)$/mu.exec(text)?.[1]?.trim()
+      const source = /^-\s*source:\s*(.+)$/mu.exec(text)?.[1]?.trim()
+      const fetched = /^-\s*fetched:\s*(.+)$/mu.exec(text)?.[1]?.trim()
+      return {
+        name,
+        ...(title === undefined ? {} : { title }),
+        ...(source === undefined ? {} : { source }),
+        ...(fetched === undefined ? {} : { fetched }),
+      }
+    })
+}
+
+/** Whether an IPv4 literal is loopback/private/link-local. */
+function isPrivateIPv4(host: string): boolean {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u.exec(host)
+  if (match === null) return false
+  const octets = match.slice(1).map(Number)
+  if (octets.some(value => value > 255)) return true
+  const [a, b] = octets
+  return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19))
+}
+
+/** Reject non-public URLs before the Host fetches a user-supplied page. */
+function assertPublicHttpUrl(raw: string): URL {
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error('url must be a valid http(s) URL')
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('url must start with http:// or https://')
+  if (url.username !== '' || url.password !== '') throw new Error('url must not contain credentials')
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/gu, '')
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) throw new Error('url must point at a public site')
+  if (host === '::1' || host === '::' || host === '0.0.0.0') throw new Error('url must point at a public site')
+  if (isPrivateIPv4(host)) throw new Error('url must point at a public site')
+  if (/^(fc|fd|fe80)/u.test(host)) throw new Error('url must point at a public site')
+  return url
+}
+
+/** Fetch one HTML page with a hard byte cap and timeout. */
+async function fetchBrandPage(url: URL): Promise<string> {
+  const response = await fetch(url, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(8000),
+    headers: { accept: 'text/html,application/xhtml+xml', 'user-agent': 'dsh-ai-diagrams/0.2 (+brand profile)' },
+  })
+  if (!response.ok) throw new Error(`fetch failed: HTTP ${String(response.status)}`)
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!/text\/html|application\/xhtml\+xml/iu.test(contentType)) {
+    throw new Error(`not an HTML page (content-type: ${contentType === '' ? 'unknown' : contentType})`)
+  }
+  const declared = Number(response.headers.get('content-length') ?? '0')
+  if (Number.isFinite(declared) && declared > MAX_BRAND_BYTES) throw new Error(`page exceeds ${String(MAX_BRAND_BYTES)} bytes`)
+  const buffer = Buffer.from(await response.arrayBuffer())
+  if (buffer.length > MAX_BRAND_BYTES) throw new Error(`page exceeds ${String(MAX_BRAND_BYTES)} bytes`)
+  return buffer.toString('utf8')
+}
+
 
 /** One tool definition, structurally compatible with `ctx.tools.register`. */
 type ToolDefinition = Record<string, unknown>
@@ -285,6 +413,55 @@ export function apply(ctx: Context): void {
     },
   }), 'ai-diagrams: svg route')
 
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: ROUTES.gallery,
+    handler: (req: IncomingMessage, res: ServerResponse) => {
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        res.end(JSON.stringify({ error: 'method not allowed' }))
+        return
+      }
+      const types = getTypes()
+      res.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        'x-content-type-options': 'nosniff',
+      })
+      res.end(JSON.stringify({ count: types.length, types }))
+    },
+  }), 'ai-diagrams: gallery route')
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: ROUTES.asset,
+    handler: (req: IncomingMessage, res: ServerResponse) => {
+      const writeError = (status: number, message: string): void => {
+        res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+        res.end(JSON.stringify({ error: message }))
+      }
+      if (!previewGuard(req, res, writeError)) return
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      const name = url.searchParams.get('name') ?? ''
+      if (!exampleAssets().has(name)) {
+        writeError(403, 'unknown example asset')
+        return
+      }
+      try {
+        const content = readFileSync(join(SKILL_DIR, 'assets', name), 'utf8')
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+          'content-security-policy': "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data:; base-uri 'none'",
+        })
+        res.end(content)
+      } catch (error) {
+        writeError(404, error instanceof Error ? error.message : 'example not found')
+      }
+    },
+  }), 'ai-diagrams: asset route')
+
   // ── tools ─────────────────────────────────────────────────────────────────
   const tools = (ctx as unknown as { tools: { register(definition: ToolDefinition): unknown } }).tools
 
@@ -476,6 +653,187 @@ export function apply(ctx: Context): void {
         truncated: digest.truncated,
         digest: renderDigest(digest),
       }
+    },
+  })
+
+  tools.register({
+    name: TOOL_NAMES.types,
+    description: 'List or search the 50 diagram types bundled with the diagram-design skill. Each entry has the type slug (use it in the prompt or in diagram_save), its title and the upstream "Best for" guidance. Prefer this over reading the large type table in SKILL.md; then load the matching references/type-<slug>.md before drawing.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string', description: 'Optional case-insensitive filter on slug, title and "Best for" text (e.g. "sequence", "quadrant", "ER").' },
+        limit: { type: 'integer', minimum: 1, maximum: 50, description: 'Maximum entries to return (default 50).' },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          total: { type: 'integer' },
+          types: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                slug: { type: 'string' },
+                title: { type: 'string' },
+                bestFor: { type: 'string' },
+                example: { type: 'string' },
+              },
+              required: ['slug', 'title', 'bestFor'],
+            },
+          },
+        },
+        required: ['total', 'types'],
+      },
+      render: (_args: unknown, value: { total: number; types: { slug: string; title: string; bestFor: string }[] }) => [{
+        type: 'text',
+        text: value.types.length === 0
+          ? 'No diagram type matches that query. Try "flowchart", "architecture", "sequence", "timeline" or a broader word.'
+          : [`${String(value.total)} matching type${value.total === 1 ? '' : 's'}:`, ...value.types.map(item => `- ${item.slug} — ${item.title}${item.bestFor === '' ? '' : ` — ${item.bestFor}`}`), '', 'Load references/type-<slug>.md for the chosen type before drawing.'].join('\n'),
+      }],
+    },
+    execute: (args: { query?: unknown; limit?: unknown }) => {
+      const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : ''
+      const limit = typeof args.limit === 'number' && Number.isFinite(args.limit) ? Math.max(1, Math.min(50, Math.trunc(args.limit))) : 50
+      const all = getTypes()
+      const matched = query === ''
+        ? all
+        : all.filter(type => `${type.slug} ${type.title} ${type.bestFor}`.toLowerCase().includes(query))
+      return {
+        total: matched.length,
+        types: matched.slice(0, limit).map(type => ({
+          slug: type.slug,
+          title: type.title,
+          bestFor: type.bestFor,
+          ...(type.example === undefined ? {} : { example: type.example }),
+        })),
+      }
+    },
+  })
+
+  tools.register({
+    name: TOOL_NAMES.profile,
+    description: 'Manage reusable brand profiles for diagram-design. "fetch" reads a public site and extracts its palette and typefaces into $DSH_HOME/editorial-diagrams/profiles/<name>.md; then read it and apply those tokens to {ink}/{paper}/{accent} and the heading/body fonts. "list"/"get"/"delete" manage saved profiles. Do not fetch private/intranet URLs.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        action: { type: 'string', enum: ['list', 'fetch', 'get', 'delete'], description: 'Operation to perform (default list).' },
+        url: { type: 'string', description: 'For action=fetch: the public http(s) page to learn the brand from.' },
+        name: { type: 'string', description: 'Profile name (slug). For fetch it defaults to the site hostname; for get/delete it is required.' },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          action: { type: 'string' },
+          name: { type: 'string' },
+          path: { type: 'string' },
+          content: { type: 'string' },
+          palette: { type: 'array' },
+          fonts: { type: 'array' },
+          profiles: { type: 'array' },
+        },
+        required: ['action'],
+      },
+      render: (_args: unknown, value: { action: string; name?: string; path?: string; content?: string; palette?: unknown[]; fonts?: unknown[]; profiles?: { name: string; title?: string; source?: string }[] }) => {
+        if (value.action === 'fetch') {
+          return [{ type: 'text', text: `Saved brand profile "${value.name ?? 'profile'}" at ${value.path ?? ''}.\n\n${value.content ?? ''}` }]
+        }
+        if (value.action === 'get') return [{ type: 'text', text: value.content ?? 'profile not found' }]
+        if (value.action === 'delete') return [{ type: 'text', text: `Deleted brand profile "${value.name ?? 'profile'}"${value.path === undefined ? '.' : ` (${value.path}).`}` }]
+        const profiles = value.profiles ?? []
+        return [{
+          type: 'text',
+          text: profiles.length === 0
+            ? 'No saved brand profiles. Fetch one with action="fetch" and a public URL.'
+            : ['Saved brand profiles:', ...profiles.map(profile => `- ${profile.name}${profile.title === undefined ? '' : ` — ${profile.title}`}${profile.source === undefined ? '' : ` (${profile.source})`}`)].join('\n'),
+        }]
+      },
+    },
+    execute: async (args: { action?: unknown; url?: unknown; name?: unknown }) => {
+      const action = typeof args.action === 'string' && args.action !== '' ? args.action : 'list'
+      const dir = brandProfileDir()
+      if (action === 'list') {
+        return { action, profiles: listProfiles(dir) }
+      }
+      const rawName = typeof args.name === 'string' ? args.name.trim() : ''
+      if (action === 'fetch') {
+        if (typeof args.url !== 'string' || args.url.trim() === '') throw new Error('url is required for action="fetch"')
+        const url = assertPublicHttpUrl(args.url.trim())
+        const html = await fetchBrandPage(url)
+        const profile = extractBrandProfile(html, url.toString())
+        const name = safeProfileName(rawName === '' ? url.hostname : rawName)
+        const path = profilePath(dir, name)
+        const content = renderProfile(profile, name)
+        atomicWrite(path, content)
+        return { action, name, path, content, palette: profile.palette, fonts: profile.fonts }
+      }
+      if (rawName === '') throw new Error(`name is required for action="${action}"`)
+      const name = safeProfileName(rawName)
+      const path = profilePath(dir, name)
+      if (action === 'get') {
+        if (!existsSync(path)) throw new Error(`brand profile not found: ${name}`)
+        return { action, name, path, content: readFileSync(path, 'utf8') }
+      }
+      if (action === 'delete') {
+        if (!existsSync(path)) throw new Error(`brand profile not found: ${name}`)
+        rmSync(path, { force: true })
+        return { action, name, path }
+      }
+      throw new Error(`unknown action: ${action}`)
+    },
+  })
+
+  tools.register({
+    name: TOOL_NAMES.png,
+    description: 'Rasterize a saved diagram HTML into a PNG file in the workspace (next to the HTML by default) by driving the machine\'s installed Chrome/Chromium headlessly at 2× scale. Use it when a PNG file is needed for a document, slide or submission instead of asking the user to click the card button. Requires a Chrome/Chromium install; set CHROME_PATH when it is not in a standard location.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        path: { type: 'string', description: 'Workspace-relative .html path; defaults to the latest diagram saved in this session.' },
+        output: { type: 'string', description: 'Optional workspace-relative .png output path; defaults to diagrams/<name>.png next to the HTML.' },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          path: { type: 'string' },
+          bytes: { type: 'integer' },
+          width: { type: 'integer' },
+          height: { type: 'integer' },
+          browser: { type: 'string' },
+        },
+        required: ['path', 'bytes', 'width', 'height'],
+      },
+      render: (_args: unknown, value: { path: string; bytes: number; width: number; height: number }) => [{
+        type: 'text',
+        text: `PNG written to ${value.path} (${String(value.width)}×${String(value.height)}, ${String(value.bytes)} bytes).`,
+      }],
+    },
+    execute: async (args: { path?: unknown; output?: unknown }, exec: { agent?: unknown; signal?: unknown }) => {
+      const target = await targetDiagram(ctx, exec, args.path)
+      const browser = findBrowser()
+      if (browser === undefined) {
+        throw new Error('no Chrome/Chromium found for host-side PNG export. Install one, set CHROME_PATH, or click PNG on the diagram card (the browser half rasterizes it without this dependency).')
+      }
+      const output = typeof args.output === 'string' && args.output.trim() !== ''
+        ? workspacePath(target.cwd, args.output.trim())
+        : join(target.cwd, 'diagrams', `${target.path.split(sep).pop()!.replace(/\.html$/iu, '')}.png`)
+      if (!output.toLowerCase().endsWith('.png')) throw new Error('output must end with .png')
+      mkdirSync(dirname(output), { recursive: true })
+      const rendered = renderPng({ browser, htmlPath: target.path, outPath: output })
+      return { path: output, bytes: rendered.bytes, width: rendered.width, height: rendered.height, browser }
     },
   })
 }

@@ -66,6 +66,13 @@
 - README 加了 npm badge、市场/工坊 PR 链接和示例图；PUBLISHING §5 记录发布状态。
 - 凭据处理：GitHub 用 device flow token、npm 用 web 登录 token；都只写在工作区 `.secrets/`（已 gitignore 范围外）。
 
+## P1 完成（2026-11-16 14:32）
+- 新增工具：`diagram_types`、`diagram_profile`、`diagram_png`；PlantUML 子集解析（12 个 import 测试）。
+- 新增右侧栏画廊页签（`diagrams-gallery`）：搜索/示例预览/复制提示词；loopback gallery + asset 路由。
+- 品牌 profile：抓取公开站点 palette/字体 → `$DSH_HOME/editorial-diagrams/profiles/*.md`，list/get/delete；拒私网、1 MB 上限。
+- 主机 PNG：调用本机 Chrome/Chromium headless 2× 落盘；找不到浏览器时报可操作错误。
+- 284 tests（含 gallery/png/profile/panel 测试）、typecheck、build 全部通过；版本 0.2.0。
+
 ## 待办
 1. 生成市场截图/演示 GIF（真机卡片 + 画廊）
 2. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿

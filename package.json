@@ -1,7 +1,7 @@
 {
   "name": "dsh-ai-diagrams",
-  "version": "0.1.0",
-  "description": "Editorial diagrams for DeepSeek Harness: the agent draws a diagram as one self-contained HTML file with inline SVG, it renders inline in the chat, and you can export SVG/PNG. 50 diagram types, redraws draw.io / Mermaid / Excalidraw / PlantUML, brand onboarding. No Python, no Playwright.",
+  "version": "0.2.0",
+  "description": "Editorial diagrams for DeepSeek Harness: the agent draws one self-contained HTML file with inline SVG, it renders inline in the chat, and you can export SVG/PNG. 50 diagram types with a sidebar gallery, PlantUML/redraw imports, reusable brand profiles, and workspace PNG export. No Python, no Playwright.",
   "icon": "icon.svg",
   "type": "module",
   "main": "lib/index.js",
@@ -31,7 +31,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-renderer",
-        "@deepseek-ai/dsh-client-ui-tool"
+        "@deepseek-ai/dsh-client-ui-tool",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
       ],
       "platform": "web"
     }

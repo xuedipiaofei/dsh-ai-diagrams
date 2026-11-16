@@ -51,7 +51,16 @@ process after npm + awesome; keywords: `diagram`, `diagram-design`,
 - **官方创意工坊 PR**：[dsh-community-plugins#111](https://github.com/zhu1090093659/dsh-community-plugins/pull/111)，
   已按 `community.json` 的 id 升序单点插入；`pnpm community:check` 等价脚本与单测本地 10/10 通过。
 
-## 6. 后续发布（新版本时）
+## 6. 0.2.0（P1）
+
+- 新增 `diagram_types`（类型检索）、`diagram_profile`（品牌 profile）、`diagram_png`（主机侧 2× PNG）。
+- 右侧栏「AI 图表画廊」页签：搜索、示例预览、复制提示词；`/api/dsh-ai-diagrams/gallery` +
+  `/asset` 两个 loopback 路由，示例只允许 skill 自带的 `example-*.html`。
+- PlantUML 导入从“识别但不解析”升级为 participant/class 子集解析（方向、别名、关系）。
+- 品牌 profile 存到 `$DSH_HOME/editorial-diagrams/profiles`，fetch 拒绝私网/回环目标，页面 1 MB 上限。
+- 284 tests / typecheck / build 通过。
+
+## 7. 后续发布（新版本时）
 
 ```sh
 cd dsh-ai-diagrams

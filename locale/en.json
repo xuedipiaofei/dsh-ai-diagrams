@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "AI diagrams",
-    "description": "Editorial diagrams in chat: the agent draws one self-contained HTML file with inline SVG and it renders right in the transcript; 50 diagram types, redraws draw.io / Mermaid / Excalidraw, exports SVG and PNG, matches a website's brand. No Python, no Playwright.",
+    "description": "Editorial diagrams in chat: one self-contained HTML file with inline SVG renders right in the transcript; 50 diagram types with a sidebar gallery, redraws draw.io / Mermaid / Excalidraw / PlantUML, reusable brand profiles, SVG/PNG export. No Python, no Playwright.",
     "detail": "docs/DETAIL.md"
   }
 }

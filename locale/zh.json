@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "AI 图表",
-    "description": "聊天里生成编辑设计风格图表：模型产出一个自包含的 HTML（内联 SVG），对话里直接预览；50 种图表类型，可重画 draw.io / Mermaid / Excalidraw，可导出 SVG/PNG，能按网站品牌配色。不需要 Python，不需要 Playwright。",
+    "description": "聊天里生成编辑设计风格图表：自包含 HTML（内联 SVG）直接在对话里预览；50 种图表类型（右侧栏画廊），可重画 draw.io / Mermaid / Excalidraw / PlantUML，可保存可复用品牌 profile，可导出 SVG/PNG。不需要 Python，不需要 Playwright。",
     "detail": "docs/DETAIL.md"
   }
 }

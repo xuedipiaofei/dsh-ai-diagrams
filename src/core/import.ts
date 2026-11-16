@@ -3,9 +3,9 @@
  * already has, so the agent can redraw them in the diagram-design style.
  *
  * Supported: draw.io (`.drawio`, plain or compressed mxfile), Mermaid
- * (`.mmd`/`.mermaid`, flowchart and sequence), Excalidraw (`.excalidraw` JSON).
- * PlantUML is accepted but returns a read-it-yourself digest note (the skill's
- * type references own that redraw path); this tool never renders a source.
+ * (`.mmd`/`.mermaid`, flowchart and sequence), Excalidraw (`.excalidraw` JSON),
+ * PlantUML (`.puml`/`.plantuml`, sequence and class subsets). This tool never
+ * renders a source.
  */
 import { inflateRawSync } from 'node:zlib'
 
@@ -27,7 +27,12 @@ export interface ImportEdge {
   to: string
   /** Optional edge label. */
   label?: string
+  /** True when the source draws the relationship dashed or dotted. */
+  dashed?: boolean
 }
+
+/** Coarse dialect of a PlantUML source. */
+export type PlantUmlKind = 'class' | 'sequence' | 'plantuml'
 
 /** Normalized structure handed to the model for a redraw. */
 export interface ImportDigest {
@@ -35,6 +40,8 @@ export interface ImportDigest {
   format: 'drawio' | 'mermaid' | 'excalidraw' | 'plantuml'
   /** Diagram title/section when the source has one. */
   title?: string
+  /** Source dialect sub-kind when the format has one (PlantUML sequence/class). */
+  kind?: PlantUmlKind
   /** Nodes, capped. */
   nodes: ImportNode[]
   /** Edges, capped. */
@@ -45,6 +52,18 @@ export interface ImportDigest {
   notes: string[]
   /** True when node/edge caps truncated the digest. */
   truncated: boolean
+}
+
+/** Result of the PlantUML subset parser. */
+export interface PlantUmlDigest {
+  nodes: ImportNode[]
+  edges: ImportEdge[]
+  kind: PlantUmlKind
+  title?: string
+  /** Present only when nothing parseable was found. */
+  note?: string
+  /** Present only when the caps truncated the result. */
+  truncated?: boolean
 }
 
 /** Digest caps keep a redraw prompt small. */
@@ -276,6 +295,230 @@ export function parseExcalidraw(source: string): ImportDigest {
   }
 }
 
+/** Sequence lifeline keywords. */
+const PLANTUML_PARTICIPANTS = 'participant|actor|boundary|control|entity|database|collections|queue'
+
+/** Class-diagram classifier keywords. */
+const PLANTUML_CLASSIFIERS = 'abstract\\s+class|class|interface|enum'
+
+/** One quoted or bare PlantUML name (spaces only inside quotes). */
+const PLANTUML_NAME = '(?:"[^"]+"|[^\\s:{}<>"]+)'
+
+/** Class-diagram arrows, longest forms first so the regex never stops early. */
+const PLANTUML_CLASS_ARROWS = [
+  '<\\|--', '<\\|\\.\\.', '--\\|>', '\\.\\.\\|>', '\\*--', '--\\*',
+  'o--', '--o', '<--', '-->', '<\\.\\.', '\\.\\.>', '--', '\\.\\.',
+]
+
+/** Sequence message arrows, longest forms first. */
+const PLANTUML_MESSAGE_ARROWS = ['<<--', '-->>', '<<-', '<--', '->>', '-->', '<-', '->']
+
+/** One participant-ish declaration line. */
+const PLANTUML_PARTICIPANT_DECLARATION = new RegExp(`^(?:${PLANTUML_PARTICIPANTS})\\s+(.+)$`, 'iu')
+
+/** One class-diagram declaration line. */
+const PLANTUML_CLASS_DECLARATION = new RegExp(`^(?:${PLANTUML_CLASSIFIERS})\\s+(.+)$`, 'iu')
+
+/** One class-diagram relation, with optional quoted cardinalities. */
+const PLANTUML_CLASS_RELATION = new RegExp(
+  `^(${PLANTUML_NAME})\\s*(?:"[^"]*"\\s*)?(${PLANTUML_CLASS_ARROWS.join('|')})\\s*(?:"[^"]*"\\s*)?(${PLANTUML_NAME})(?:\\s*:\\s*(.*))?$`,
+  'u',
+)
+
+/** One sequence message line. */
+const PLANTUML_MESSAGE = new RegExp(
+  `^(${PLANTUML_NAME})\\s*(${PLANTUML_MESSAGE_ARROWS.join('|')})\\s*(${PLANTUML_NAME})(?:\\s*:\\s*(.*))?$`,
+  'u',
+)
+
+/** Split PlantUML source into content lines, dropping comments and directives. */
+function plantUmlLines(source: string): string[] {
+  const lines: string[] = []
+  let inBlockComment = false
+  for (const raw of source.replace(/^\uFEFF/u, '').split(/\r?\n/u)) {
+    const line = raw.trim()
+    if (inBlockComment) {
+      if (line.includes("'/")) inBlockComment = false
+      continue
+    }
+    if (line.startsWith("/'")) {
+      if (!line.includes("'/", 2)) inBlockComment = true
+      continue
+    }
+    if (line === '' || line.startsWith("'")) continue
+    if (/^(?:@startuml\b|@enduml\b|skinparam\b|!theme\b)/iu.test(line)) continue
+    lines.push(line)
+  }
+  return lines
+}
+
+/** Remove trailing PlantUML decoration (`#color`, `<<stereotype>>`, `order N`). */
+function stripPlantUmlDecoration(value: string): string {
+  let text = value.trim()
+  for (;;) {
+    const before = text
+    text = text
+      .replace(/\s*<<[^<>]*>>\s*$/u, '')
+      .replace(/\s+#{1,2}[^\s]*\s*$/u, '')
+      .replace(/\s+order\s+\d+\s*$/iu, '')
+      .trim()
+    if (text === before) return text
+  }
+}
+
+/** Drop an inline classifier body (`{ ... }`) and keep the declaration head. */
+function withoutPlantUmlBody(value: string): string {
+  const brace = value.indexOf('{')
+  return (brace === -1 ? value : value.slice(0, brace)).trim()
+}
+
+/** Read a declaration as `Name`, `"Label" as Alias`, or `Alias as "Label"`. */
+function plantUmlName(value: string): { id: string; label: string } | undefined {
+  const text = value.trim()
+  const quotedLabel = /^"([^"]*)"\s+as\s+([^\s{}"]+)$/u.exec(text)
+  if (quotedLabel !== null) {
+    const id = quotedLabel[2]!
+    const label = cleanLabel(quotedLabel[1]!)
+    return { id, label: label === '' ? id : label }
+  }
+  const quotedAlias = /^([^\s{}"]+)\s+as\s+"([^"]*)"$/u.exec(text)
+  if (quotedAlias !== null) {
+    const id = quotedAlias[1]!
+    const label = cleanLabel(quotedAlias[2]!)
+    return { id, label: label === '' ? id : label }
+  }
+  const bareAlias = /^([^\s{}"]+)\s+as\s+([^\s{}"]+)$/u.exec(text)
+  if (bareAlias !== null) {
+    return { id: bareAlias[2]!, label: cleanLabel(bareAlias[1]!) || bareAlias[2]! }
+  }
+  const quoted = /^"([^"]*)"$/u.exec(text)
+  if (quoted !== null) {
+    const id = (quoted[1] ?? '').trim()
+    if (id === '') return undefined
+    const label = cleanLabel(id)
+    return { id, label: label === '' ? id : label }
+  }
+  const bare = /^([^\s{}"]+)$/u.exec(text)
+  if (bare !== null) {
+    const id = bare[1]!
+    return { id, label: cleanLabel(id) || id }
+  }
+  return undefined
+}
+
+/** Strip the quotes from one relation endpoint. */
+function plantUmlEndpoint(value: string): string {
+  const text = value.trim()
+  return text.length >= 2 && text.startsWith('"') && text.endsWith('"') ? text.slice(1, -1).trim() : text
+}
+
+/** Map a class-diagram arrow to its semantic direction (child → parent, whole → part, ...). */
+function plantUmlClassEnds(left: string, right: string, arrow: string): { from: string; to: string } {
+  if (arrow.startsWith('<|') || arrow.startsWith('<..')) return { from: right, to: left }
+  if (arrow.endsWith('|>')) return { from: left, to: right }
+  if (arrow.startsWith('*') || arrow.startsWith('o')) return { from: left, to: right }
+  if (arrow.endsWith('*') || arrow.endsWith('o')) return { from: right, to: left }
+  if (arrow.startsWith('<')) return { from: right, to: left }
+  return { from: left, to: right }
+}
+
+/** Parse the supported PlantUML subset: sequence participants/messages and class declarations/relations. */
+export function parsePlantUml(source: string): PlantUmlDigest {
+  const lines = plantUmlLines(source)
+  const nodes = new Map<string, ImportNode>()
+  let title: string | undefined
+  let hasParticipant = false
+  let hasClassDeclaration = false
+
+  // Pass 1: declarations. Reading them first keeps relation targets and labels
+  // deterministic even when one is declared after the first message.
+  for (const line of lines) {
+    const titleLine = /^title\s+(.+)$/iu.exec(line)
+    if (titleLine !== null) {
+      const value = cleanLabel(titleLine[1]!)
+      if (value !== '' && title === undefined) title = value
+      continue
+    }
+    const participant = PLANTUML_PARTICIPANT_DECLARATION.exec(line)
+    if (participant !== null) {
+      const name = plantUmlName(stripPlantUmlDecoration(withoutPlantUmlBody(participant[1]!)))
+      if (name !== undefined) {
+        hasParticipant = true
+        if (!nodes.has(name.id)) nodes.set(name.id, { id: name.id, label: name.label })
+      }
+      continue
+    }
+    const classifier = PLANTUML_CLASS_DECLARATION.exec(line)
+    if (classifier !== null) {
+      const name = plantUmlName(stripPlantUmlDecoration(withoutPlantUmlBody(classifier[1]!)))
+      if (name !== undefined) {
+        hasClassDeclaration = true
+        classIds.add(name.id)
+        if (!nodes.has(name.id)) nodes.set(name.id, { id: name.id, label: name.label })
+      }
+    }
+  }
+
+  // Pass 2: messages and relations (declarations were consumed above).
+  const edges: ImportEdge[] = []
+  let hasLabelledMessage = false
+  const ensureNode = (id: string): void => {
+    if (id !== '' && !nodes.has(id)) nodes.set(id, { id, label: id })
+  }
+  for (const line of lines) {
+    if (/^title\b/iu.test(line) || PLANTUML_PARTICIPANT_DECLARATION.test(line) || PLANTUML_CLASS_DECLARATION.test(line)) continue
+    const relation = PLANTUML_CLASS_RELATION.exec(line)
+    if (relation !== null) {
+      const arrow = relation[2]!
+      const classSpecific = arrow === '--' || /[|*o]|\.\./u.test(arrow)
+      if (classSpecific || hasClassDeclaration) {
+        const left = plantUmlEndpoint(relation[1]!)
+        const right = plantUmlEndpoint(relation[3]!)
+        const ends = plantUmlClassEnds(left, right, arrow)
+        const label = cleanLabel(relation[4] ?? '')
+        edges.push({
+          ...ends,
+          ...(label === '' ? {} : { label }),
+          ...(arrow.includes('..') ? { dashed: true } : {}),
+        })
+        ensureNode(ends.from)
+        ensureNode(ends.to)
+        continue
+      }
+    }
+    const message = PLANTUML_MESSAGE.exec(line)
+    if (message === null) continue
+    const arrow = message[2]!
+    const left = plantUmlEndpoint(message[1]!)
+    const right = plantUmlEndpoint(message[3]!)
+    // A left-pointing arrowhead (`B <- A`) means A sends to B.
+    const reversed = arrow.startsWith('<')
+    const from = reversed ? right : left
+    const to = reversed ? left : right
+    const label = cleanLabel(message[4] ?? '')
+    if (label !== '') hasLabelledMessage = true
+    edges.push({
+      from,
+      to,
+      ...(label === '' ? {} : { label }),
+      ...(arrow.includes('--') ? { dashed: true } : {}),
+    })
+    ensureNode(from)
+    ensureNode(to)
+  }
+
+  const truncated = nodes.size > MAX_NODES || edges.length > MAX_EDGES
+  const empty = nodes.size === 0 && edges.length === 0
+  return {
+    nodes: [...nodes.values()].slice(0, MAX_NODES),
+    edges: edges.slice(0, MAX_EDGES),
+    kind: hasClassDeclaration ? 'class' : hasParticipant || hasLabelledMessage ? 'sequence' : 'plantuml',
+    ...(title === undefined ? {} : { title }),
+    ...(empty ? { note: 'PlantUML：未识别到可解析的 participant/class/关系行' } : {}),
+    ...(truncated ? { truncated: true } : {}),
+  }
+}
+
 /** Detect a source format from its file name and content. */
 export function detectFormat(fileName: string, content: string): ImportDigest['format'] {
   const lower = fileName.toLowerCase()
@@ -291,13 +534,15 @@ export function importDiagram(fileName: string, content: string): ImportDigest {
   if (format === 'drawio') return parseDrawio(content)
   if (format === 'excalidraw') return parseExcalidraw(content)
   if (format === 'plantuml') {
-    const kind = /^\s*@startuml\b/imu.test(content) ? (/sequence|->|-->/iu.test(content) ? 'sequence' : 'uml') : 'unknown'
+    const parsed = parsePlantUml(content)
     return {
       format: 'plantuml',
-      nodes: [],
-      edges: [],
-      notes: [`PlantUML ${kind} source detected; structured extraction is not implemented yet — read the .puml file and redraw it with the matching type reference`],
-      truncated: false,
+      ...(parsed.title === undefined ? {} : { title: parsed.title }),
+      kind: parsed.kind,
+      nodes: parsed.nodes,
+      edges: parsed.edges,
+      notes: parsed.note === undefined ? [] : [parsed.note],
+      truncated: parsed.truncated === true,
     }
   }
   return parseMermaid(content)
@@ -305,10 +550,11 @@ export function importDiagram(fileName: string, content: string): ImportDigest {
 
 /** Render a digest as compact text for the model. */
 export function renderDigest(digest: ImportDigest): string {
-  const lines = [`${digest.format}${digest.title === undefined ? '' : ` "${digest.title}"`}: ${digest.nodes.length} node(s), ${digest.edges.length} edge(s)${digest.truncated ? ' (truncated)' : ''}`]
+  const kind = digest.kind === undefined ? '' : ` (${digest.kind})`
+  const lines = [`${digest.format}${kind}${digest.title === undefined ? '' : ` "${digest.title}"`}: ${digest.nodes.length} node(s), ${digest.edges.length} edge(s)${digest.truncated ? ' (truncated)' : ''}`]
   for (const node of digest.nodes.slice(0, 80)) lines.push(`- node ${node.id} "${node.label}"${node.kind === undefined ? '' : ` [${node.kind}]`}`)
   if (digest.nodes.length > 80) lines.push(`- … ${digest.nodes.length - 80} more node(s)`)
-  for (const edge of digest.edges.slice(0, 80)) lines.push(`- edge ${edge.from} -> ${edge.to}${edge.label === undefined ? '' : ` "${edge.label}"`}`)
+  for (const edge of digest.edges.slice(0, 80)) lines.push(`- edge ${edge.from} -> ${edge.to}${edge.dashed === true ? ' (dashed)' : ''}${edge.label === undefined ? '' : ` "${edge.label}"`}`)
   if (digest.edges.length > 80) lines.push(`- … ${digest.edges.length - 80} more edge(s)`)
   if (digest.groups !== undefined && digest.groups.length > 0) lines.push(`- groups: ${digest.groups.join(', ')}`)
   for (const note of digest.notes) lines.push(`- note: ${note}`)

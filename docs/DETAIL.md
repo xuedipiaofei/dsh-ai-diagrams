@@ -25,16 +25,26 @@ skill.
 | tool | `diagram_save` | Save + validate + inline preview |
 | tool | `diagram_svg` | Standalone SVG export |
 | tool | `diagram_validate` | Accessible-SVG / single-file contract check |
-| tool | `diagram_import` | Structure digest from existing diagram sources |
+| tool | `diagram_import` | Structure digest from existing diagram sources (draw.io / Mermaid / Excalidraw / PlantUML) |
+| tool | `diagram_types` | Search the 50 bundled diagram types |
+| tool | `diagram_profile` | Fetch/list/get/delete reusable brand profiles |
+| tool | `diagram_png` | Rasterize a saved diagram into a workspace PNG |
 | route | `/api/dsh-ai-diagrams/raw` | Loopback-only preview of files this plugin saved |
 | route | `/api/dsh-ai-diagrams/svg` | Loopback-only SVG export used by the card |
+| route | `/api/dsh-ai-diagrams/gallery` | Diagram-type index for the sidebar gallery |
+| route | `/api/dsh-ai-diagrams/asset` | Loopback-only preview of a bundled example page |
+| sidebar | `diagrams-gallery` | Gallery page in the right Sidebar (guide entry) |
 
 ## Limits
 
 - Static documents only: no scripts and no remote assets except Google Fonts.
   Motion variants are not previewed.
 - The skill's painted-geometry verifier is not ported to the DSH validator.
-- PNG export happens in the browser; webfonts fall back to local fonts there.
+- PNG export happens in the browser on the card; the `diagram_png` tool needs a
+  locally installed Chrome/Chromium and falls back to the card button when none
+  is found. Webfonts fall back to local fonts in rasterized output.
+- `diagram_profile fetch` reads public HTML pages only (loopback/private
+  targets rejected, 1 MB cap) and stores profiles under `$DSH_HOME/editorial-diagrams/profiles`.
 
 ## License
 

@@ -13,16 +13,19 @@ export const SAVE_TOOL = 'diagram_save'
 export const ROUTES = {
   raw: '/api/dsh-ai-diagrams/raw',
   svg: '/api/dsh-ai-diagrams/svg',
+  gallery: '/api/dsh-ai-diagrams/gallery',
+  asset: '/api/dsh-ai-diagrams/asset',
 } as const
 
-/** Tool-result presentation metadata for one saved diagram. */
-export interface DiagramMeta {
-  /** Diagram title. */
-  title?: string
-  /** Absolute path of the saved HTML file. */
-  path?: string
-  /** Saved byte count. */
-  bytes?: number
+/** Sidebar tab kind for the gallery page. */
+export const GALLERY_KIND = 'diagrams-gallery'
+
+/** One diagram type as served by the gallery route. */
+export interface GalleryType {
+  slug: string
+  title: string
+  bestFor: string
+  example?: string
 }
 
 /** Build a preview/raw URL for one saved diagram path. */
@@ -33,6 +36,26 @@ export function rawUrl(path: string): string {
 /** Build an SVG export URL; `fonts=none` keeps the SVG offline-friendly. */
 export function svgUrl(path: string, fonts: 'google' | 'none'): string {
   return `${ROUTES.svg}?path=${encodeURIComponent(path)}&fonts=${fonts}`
+}
+
+/** Gallery index URL. */
+export function galleryUrl(): string {
+  return ROUTES.gallery
+}
+
+/** Preview URL for one bundled example asset. */
+export function assetUrl(name: string): string {
+  return `${ROUTES.asset}?name=${encodeURIComponent(name)}`
+}
+
+/** Tool-result presentation metadata for one saved diagram. */
+export interface DiagramMeta {
+  /** Diagram title. */
+  title?: string
+  /** Absolute path of the saved HTML file. */
+  path?: string
+  /** Saved byte count. */
+  bytes?: number
 }
 
 /** Filesystem-safe file stem for a title (trimmed, never a bare dash). */

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -67,7 +67,7 @@ function fakeRequest(url: string, remoteAddress = '127.0.0.1'): any {
 }
 
 describe('host plugin wiring', () => {
-  it('registers the bundled skill, four tools and the preview routes', async () => {
+  it('registers the bundled skill, the tools and the preview routes', async () => {
     const { ctx, tools, routes, provider } = makeContext(workspace)
     apply(ctx)
     expect([...tools.keys()].sort()).toEqual(Object.values(TOOL_NAMES).sort())
@@ -144,5 +144,72 @@ describe('host plugin wiring', () => {
     expect(digest.format).toBe('mermaid')
     expect(digest.nodes).toBeGreaterThanOrEqual(3)
     expect(digest.digest).toContain('edge')
+  })
+
+  it('serves the gallery index and only bundled example assets', () => {
+    const { ctx, routes } = makeContext(workspace)
+    apply(ctx)
+    const gallery = routes.find(route => route.path === ROUTES.gallery)!
+    const galleryResponse = fakeResponse()
+    gallery.handler(fakeRequest(ROUTES.gallery), galleryResponse.res)
+    expect(galleryResponse.result().status).toBe(200)
+    const payload = JSON.parse(galleryResponse.result().body)
+    expect(payload.count).toBe(50)
+    expect(payload.types[0]).toHaveProperty('slug')
+    expect(payload.types.some((type: { slug: string }) => type.slug === 'flowchart')).toBe(true)
+
+    const asset = routes.find(route => route.path === ROUTES.asset)!
+    const example = fakeResponse()
+    asset.handler(fakeRequest(`${ROUTES.asset}?name=example-flowchart.html`), example.res)
+    expect(example.result().status).toBe(200)
+    expect(example.result().headers['content-security-policy']).toContain("default-src 'none'")
+    expect(example.result().body).toContain('<!DOCTYPE html>')
+
+    const traversal = fakeResponse()
+    asset.handler(fakeRequest(`${ROUTES.asset}?name=../../etc/passwd`), traversal.res)
+    expect(traversal.result().status).toBe(403)
+
+    const remote = fakeResponse()
+    asset.handler(fakeRequest(`${ROUTES.asset}?name=example-flowchart.html`, '10.0.0.9'), remote.res)
+    expect(remote.result().status).toBe(403)
+  })
+
+  it('lists and filters the bundled diagram types', () => {
+    const { ctx, tools } = makeContext(workspace)
+    apply(ctx)
+    const all = tools.get(TOOL_NAMES.types).execute({})
+    expect(all.total).toBe(50)
+    expect(all.types).toHaveLength(50)
+    const sequence = tools.get(TOOL_NAMES.types).execute({ query: 'sequence' })
+    expect(sequence.total).toBeGreaterThan(0)
+    expect(sequence.types.some((type: { slug: string }) => type.slug === 'sequence')).toBe(true)
+    expect(tools.get(TOOL_NAMES.types).execute({ query: 'no-such-type-xyz' }).total).toBe(0)
+  })
+
+  it('lists, reads and deletes brand profiles under DSH_HOME', async () => {
+    const previous = process.env.DSH_HOME
+    process.env.DSH_HOME = join(workspace, 'dsh-home')
+    try {
+      const { ctx, tools } = makeContext(workspace)
+      apply(ctx)
+      const profile = tools.get(TOOL_NAMES.profile)
+      expect((await profile.execute({ action: 'list' })).profiles).toEqual([])
+
+      const dir = join(workspace, 'dsh-home', 'editorial-diagrams', 'profiles')
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, 'acme.md'), '# Brand profile: acme\n\n- source: https://acme.example/\n- title: Acme\n', 'utf8')
+
+      const listed = await profile.execute({ action: 'list' })
+      expect(listed.profiles).toHaveLength(1)
+      expect(listed.profiles[0].name).toBe('acme')
+      const got = await profile.execute({ action: 'get', name: 'acme' })
+      expect(got.content).toContain('# Brand profile: acme')
+      await expect(profile.execute({ action: 'get', name: 'missing' })).rejects.toThrow(/not found/)
+      expect((await profile.execute({ action: 'delete', name: 'acme' })).action).toBe('delete')
+      expect((await profile.execute({ action: 'list' })).profiles).toEqual([])
+    } finally {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+    }
   })
 })
