@@ -453,7 +453,6 @@ export function parsePlantUml(source: string): PlantUmlDigest {
       const name = plantUmlName(stripPlantUmlDecoration(withoutPlantUmlBody(classifier[1]!)))
       if (name !== undefined) {
         hasClassDeclaration = true
-        classIds.add(name.id)
         if (!nodes.has(name.id)) nodes.set(name.id, { id: name.id, label: name.label })
       }
     }
