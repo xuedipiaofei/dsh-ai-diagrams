@@ -1,5 +1,10 @@
 # AI 图表 · dsh-ai-diagrams
 
+[![npm](https://img.shields.io/npm/v/dsh-ai-diagrams?color=2563EB)](https://www.npmjs.com/package/dsh-ai-diagrams)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
+[![skill](https://img.shields.io/badge/skill-diagram--design%20%C2%B7%2050%20types-2563EB)](https://github.com/cathrynlavery/diagram-design)
+
+
 **DeepSeek Harness 里的编辑设计风图表。** 用一句话描述需求，模型画出一个自包含的 HTML（内联 SVG）并在对话里直接预览；可导出 HTML / SVG / PNG。50 种图表类型，能重画现有的 draw.io / Mermaid / Excalidraw / PlantUML 图，也能按你的网站品牌配色。
 
 基于 MIT 协议的 [`cathrynlavery/diagram-design`](https://github.com/cathrynlavery/diagram-design) skill（© Cathryn Lavery），除「DeepSeek Harness 工具」一节外原样内置。
