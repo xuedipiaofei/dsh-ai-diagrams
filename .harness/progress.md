@@ -56,6 +56,16 @@
 - 发布阻塞（凭据）：npm token 401 失效；GitHub 仅有 SSH（可推已有仓库），无 token/gh 无法建仓库、
   fork 或开 PR。已把解阻步骤写进 `PUBLISHING.md` §5。
 
+## 发布完成（2026-11-16 13:40）
+- npm：`dsh-ai-diagrams@0.1.0` 已发布（首次发布 npm staged 处理约 4 分钟；`dist-tags.latest=0.1.0`，tarball 200）。
+- GitHub：`xuedipiaofei/dsh-ai-diagrams` 已建仓并 push（main）。
+- awesome 市场 PR：[awesome-dsh-plugin#15783](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15783)，
+  仓库年龄门禁 0.0/1 天失败，约 24h 自动重跑。
+- 官方工坊 PR：[dsh-community-plugins#111](https://github.com/zhu1090093659/dsh-community-plugins/pull/111)，
+  `community.json` 单条插入，`node scripts/community-index.cjs --check` OK (138 entries)、10/10 tests。
+- README 加了 npm badge、市场/工坊 PR 链接和示例图；PUBLISHING §5 记录发布状态。
+- 凭据处理：GitHub 用 device flow token、npm 用 web 登录 token；都只写在工作区 `.secrets/`（已 gitignore 范围外）。
+
 ## 待办
 1. 生成市场截图/演示 GIF（真机卡片 + 画廊）
 2. npm publish + awesome PR（仓库满 1 天后再开）+ 官方创意工坊投稿

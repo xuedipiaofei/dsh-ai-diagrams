@@ -42,35 +42,20 @@ does not sync the awesome catalog. Submit the same plugin through its PR
 process after npm + awesome; keywords: `diagram`, `diagram-design`,
 `architecture`, `flowchart`, `svg`, `mermaid`, `drawio`.
 
-## 5. 当前阻塞（2026-11-16）
+## 5. 发布记录（2026-11-16）
 
-本机凭据状态：
+- **npm**：`dsh-ai-diagrams@0.1.0` 已发布（npm 首次发布走 staged 处理，约 4 分钟后 `latest` 生效）。
+- **GitHub**：https://github.com/xuedipiaofei/dsh-ai-diagrams 已创建（public，SSH push）。
+- **awesome-dsh-plugin PR**：[#15783](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15783)。
+  Submission gate 因仓库年龄（0.0 days，需要 1 天）暂时失败；检查会自行重跑，约 24h 后转绿，无需重复提交。
+- **官方创意工坊 PR**：[dsh-community-plugins#111](https://github.com/zhu1090093659/dsh-community-plugins/pull/111)，
+  已按 `community.json` 的 id 升序单点插入；`pnpm community:check` 等价脚本与单测本地 10/10 通过。
 
-- **npm**：`~/.npmrc` 里的 token 已失效（`npm whoami` → 401 Unauthorized），无法 `npm publish`。
-  需要刷新：`npm login`（或到 npmjs.com 生成新 token 写入 `~/.npmrc`）。
-- **GitHub**：SSH key 可用（`ssh -T git@github.com` → 已认证为 `xuedipiaofei`），但**没有** API token / `gh` CLI，
-  因此不能通过 API 新建仓库、fork 或开 PR。需要二选一：
-  1. 在 https://github.com/new 新建空仓库 `xuedipiaofei/dsh-ai-diagrams`（Public，不要 README），
-     之后本机执行：
-     ```sh
-     git remote add origin git@github.com:xuedipiaofei/dsh-ai-diagrams.git
-     git push -u origin main
-     ```
-  2. 提供一个有 `public_repo` 权限的 GitHub token（不要提交到仓库），即可由 agent 自动建仓库、fork、开 PR。
-
-## 6. 凭据就绪后的发布顺序
+## 6. 后续发布（新版本时）
 
 ```sh
-# 1) npm
-cd /Users/shimin/Documents/deepseek-harness/default-workspace/dsh-ai-diagrams
-npm publish --access public
-
-# 2) GitHub
-git remote add origin git@github.com:xuedipiaofei/dsh-ai-diagrams.git
-git push -u origin main
-
-# 3) awesome PR（仓库满 1 天后开；文件内容见 market/awesome-entry.yml）
-#    target: data/plugins/xuedipiaofei__dsh-ai-diagrams.yml
-
-# 4) 官方创意工坊（dsh-market.com，独立投稿）
+cd dsh-ai-diagrams
+pnpm run typecheck && pnpm run test && pnpm run build
+npm publish --access public     # 账号开启 2FA 时会走浏览器授权
+git tag v0.1.0 && git push origin v0.1.0
 ```

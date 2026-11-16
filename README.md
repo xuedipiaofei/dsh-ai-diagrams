@@ -1,8 +1,16 @@
 # AI diagrams
 
+[![npm](https://img.shields.io/npm/v/dsh-ai-diagrams?color=2563EB)](https://www.npmjs.com/package/dsh-ai-diagrams)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
+[![skill](https://img.shields.io/badge/skill-diagram--design%20%C2%B7%2050%20types-2563EB)](https://github.com/cathrynlavery/diagram-design)
+
 **Editorial diagrams for DeepSeek Harness.** Ask in plain words and the agent draws one self-contained HTML file with inline SVG; it renders directly in the chat, and you can export HTML, SVG or PNG. 50 diagram types, redraws existing draw.io / Mermaid / Excalidraw / PlantUML diagrams, and can match a website's brand.
 
 Built on the MIT-licensed [`cathrynlavery/diagram-design`](https://github.com/cathrynlavery/diagram-design) skill (© Cathryn Lavery), vendored unmodified apart from the DeepSeek Harness tools section.
+
+**Links** — [npm](https://www.npmjs.com/package/dsh-ai-diagrams) · [Marketplace PR](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15783) · [Workshop PR](https://github.com/zhu1090093659/dsh-community-plugins/pull/111)
+
+![An architecture diagram rendered by the bundled skill](docs/images/architecture-example.png)
 
 ## Install
 
