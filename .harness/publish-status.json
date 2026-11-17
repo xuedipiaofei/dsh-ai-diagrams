@@ -5,7 +5,8 @@
     "url": "https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15783",
     "state": "open",
     "merged": false,
-    "note": "PR check re-running after fixing the entry icon (svg -> raster png). Submission gate runs via workflow_run when PR check completes; repository is now >1 day old."
+    "note": "Previous failure was the icon field (svg not allowed); fixed to docs/images/icon.png in commit d50f8ed. Repository age is now > 1 day; expected to pass once the queued/长 Build 完成.",
+    "checkStatus": "PR check re-run after icon fix: all content steps passed (README/steps 5-14), still running the Build step since 2026-11-17T07:01:58Z; Submission gate runs automatically when it completes."
   },
   "workshopPr": {
     "number": 111,
@@ -30,5 +31,6 @@
     "galleryTypes": 50,
     "clientBundleRev": "e16f44629b50",
     "verified": "restarted GUI on 2026-11-17 15:00 +08: health + gallery route + new tool schemas"
-  }
+  },
+  "updatedAt": "2026-11-17T15:16:00+08:00"
 }
