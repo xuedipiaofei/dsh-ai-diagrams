@@ -60,8 +60,8 @@ export function apply(ctx: ClientContext): void {
         title: () => tt('gallery.title'),
         guide: [{
           id: 'gallery',
-          title: tt('gallery.guideTitle'),
-          description: tt('gallery.guideDescription'),
+          title: () => tt('gallery.guideTitle'),
+          description: () => tt('gallery.guideDescription'),
         }],
       })
       const disposeBody = slots.inject('sidebar.right.pane.tab', () => slots.register(
