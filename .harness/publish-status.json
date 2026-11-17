@@ -5,8 +5,23 @@
     "url": "https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15783",
     "state": "open",
     "merged": false,
-    "note": "Previous failure was the icon field (svg not allowed); fixed to docs/images/icon.png in commit d50f8ed. Repository age is now > 1 day; expected to pass once the queued/长 Build 完成.",
-    "checkStatus": "PR check re-run after icon fix: all content steps passed (README/steps 5-14), still running the Build step since 2026-11-17T07:01:58Z; Submission gate runs automatically when it completes."
+    "note": "Checks are green and the PR is mergeable/clean; waiting for a maintainer merge.",
+    "checkStatus": "all green",
+    "mergeable": true,
+    "mergeableState": "clean",
+    "checks": [
+      {
+        "name": "check",
+        "conclusion": "success",
+        "completedAt": "2026-11-17T07:35:09Z"
+      },
+      {
+        "name": "Submission gate",
+        "conclusion": "success",
+        "completedAt": "2026-11-17T07:36:10Z",
+        "summary": "All 1 submitted entry passes: dsh.bundle declared, repo old enough, enough commits."
+      }
+    ]
   },
   "workshopPr": {
     "number": 111,
@@ -32,5 +47,5 @@
     "clientBundleRev": "e16f44629b50",
     "verified": "restarted GUI on 2026-11-17 15:00 +08: health + gallery route + new tool schemas"
   },
-  "updatedAt": "2026-11-17T15:16:00+08:00"
+  "updatedAt": "2026-11-17T15:36:30+08:00"
 }
