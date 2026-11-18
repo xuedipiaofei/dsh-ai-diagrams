@@ -1,14 +1,12 @@
 {
-  "checkedAt": "2026-11-17T15:05:19+08:00",
+  "checkedAt": "2026-11-18T10:02:00+08:00",
   "awesomePr": {
     "number": 15783,
     "url": "https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/15783",
-    "state": "open",
-    "merged": false,
-    "note": "Checks are green and the PR is mergeable/clean; waiting for a maintainer merge.",
-    "checkStatus": "all green",
-    "mergeable": true,
-    "mergeableState": "clean",
+    "state": "closed",
+    "merged": true,
+    "mergedAt": "2026-11-17T17:14:08Z",
+    "mergedBy": "fkysly",
     "checks": [
       {
         "name": "check",
@@ -18,10 +16,14 @@
       {
         "name": "Submission gate",
         "conclusion": "success",
-        "completedAt": "2026-11-17T07:36:10Z",
-        "summary": "All 1 submitted entry passes: dsh.bundle declared, repo old enough, enough commits."
+        "completedAt": "2026-11-17T07:36:10Z"
       }
-    ]
+    ],
+    "inMain": true,
+    "readmeListed": true,
+    "readmeLine": "https://raw.githubusercontent.com/awesome-dsh-plugin/awesome-dsh-plugin/main/README.md (line 7218)",
+    "siteListed": true,
+    "siteListedAt": "https://awesome-dsh-plugin.com/"
   },
   "workshopPr": {
     "number": 111,
@@ -47,5 +49,5 @@
     "clientBundleRev": "e16f44629b50",
     "verified": "restarted GUI on 2026-11-17 15:00 +08: health + gallery route + new tool schemas"
   },
-  "updatedAt": "2026-11-17T15:36:30+08:00"
+  "updatedAt": "2026-11-18T10:02:00+08:00"
 }
